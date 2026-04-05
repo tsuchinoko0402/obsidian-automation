@@ -16,8 +16,23 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from src.google_api_services import get_calendar_events, get_tasks
+from src.google_api_services import get_calendar_events, get_tasks, get_completed_tasks
 from src.gemini_helper import generate_daily_update
+from src.inbox_organizer import organize_inbox
+
+def get_vault_path() -> str:
+    """Obsidian CLI を使用してVaultのルートパスを取得します。"""
+    try:
+        vault_result = subprocess.run(
+            ["obsidian", "vault", "info=path"], 
+            capture_output=True, 
+            text=True, 
+            check=True
+        )
+        return vault_result.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        print(f"Obsidian CLI の実行に失敗しました: {e.stderr}", file=sys.stderr)
+        raise
 
 def get_daily_note_path() -> str:
     """Obsidian CLI を使用して現在のデイリーノートの絶対パスを取得します。"""
@@ -74,9 +89,20 @@ def process_daily_note(period: str):
         with open(daily_path, "r", encoding="utf-8") as f:
             current_note = f.read()
             
-        print("Google Calendar と Tasks からデータを取得中...")
-        events = get_calendar_events()
-        tasks = get_tasks()
+        events = []
+        tasks = []
+        completed_tasks = []
+        
+        print("データを取得中...")
+        if period == "morning":
+            events = get_calendar_events()
+            tasks = get_tasks()
+        elif period == "evening":
+            # 夕方は現状、朝と同じく予定とタスクを取得（今後の拡張ポイント）
+            events = get_calendar_events()
+            tasks = get_tasks()
+        elif period == "night":
+            completed_tasks = get_completed_tasks()
         
         vault_root = find_vault_root(daily_path)
         prompt_template_path = os.path.join(vault_root, "_config", "templates", "prompts", "daily_edit_prompt.md")
@@ -84,7 +110,7 @@ def process_daily_note(period: str):
             prompt_template_path = None
             
         print("Gemini API でノートの更新内容を生成中...")
-        updated_note = generate_daily_update(period, current_note, events, tasks, prompt_template_path)
+        updated_note = generate_daily_update(period, current_note, events, tasks, completed_tasks, prompt_template_path)
         
         with open(daily_path, "w", encoding="utf-8") as f:
             clean_note = updated_note.strip()
@@ -106,6 +132,15 @@ def process_daily_note(period: str):
 
 def process_morning():
     """朝の処理：一日のスケジュールやタスクをデイリーノートにセットアップする"""
+    print("Obsidian でデイリーノートを生成・確認します...")
+    try:
+        # ノートが存在しない場合を考慮し、事前に obsidian daily を実行してノートを生成/開く
+        # (すでに存在する場合は単に開かれる)
+        subprocess.run(["obsidian", "daily"], check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Obsidian CLI (daily) の実行に失敗しました: {e.stderr}", file=sys.stderr)
+        # 失敗しても続行を試みる
+    
     process_daily_note("morning")
 
 def process_evening():
@@ -115,6 +150,35 @@ def process_evening():
 def process_night():
     """夜の処理：翌日に向けた最終整理とノートの確定を行う"""
     process_daily_note("night")
+    
+    print("手動レビューのために Obsidian を開きます...")
+    try:
+        subprocess.run(["obsidian", "daily"], check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Obsidian を開けませんでした: {e.stderr}", file=sys.stderr)
+        
+    # 同期スクリプトが存在する場合は実行
+    # 実行場所がプロジェクトのルートを想定
+    mirror_script = os.path.join(project_root, "mirror_obsidian.sh")
+    if os.path.exists(mirror_script):
+        print("Google Drive への同期スクリプト (mirror_obsidian.sh) を実行します...")
+        try:
+            subprocess.run(["bash", mirror_script], check=True)
+            print("-> 同期完了")
+        except subprocess.CalledProcessError as e:
+            print(f"同期スクリプトの実行に失敗しました: {e.stderr}", file=sys.stderr)
+
+def process_organize():
+    """Inboxの整理：Geminiを使ってInboxのメモを適切なフォルダへ移動し、MOCへ追記する"""
+    print("Inboxの自動整理 (organize) を開始します...")
+    try:
+        vault_root = get_vault_path()
+        print(f"Vaultルート: {vault_root}")
+        organize_inbox(vault_root)
+        print("-> 整理完了")
+    except Exception as e:
+        print(f"処理中にエラーが発生しました: {e}", file=sys.stderr)
+        raise
 
 def main():
     # .envファイルの読み込み
@@ -131,8 +195,8 @@ def main():
     )
     parser.add_argument(
         "period",
-        choices=["morning", "evening", "night"],
-        help="実行する時間帯 (morning: 朝のセットアップ, evening: 夕方の整理, night: 夜の確定)"
+        choices=["morning", "evening", "night", "organize"],
+        help="実行する処理 (morning: 朝のセットアップ, evening: 夕方の整理, night: 夜の確定, organize: Inboxの自動整理)"
     )
 
     args = parser.parse_args()
@@ -144,6 +208,8 @@ def main():
             process_evening()
         elif args.period == "night":
             process_night()
+        elif args.period == "organize":
+            process_organize()
     except Exception as e:
         print(f"予期せぬエラーが発生しました: {e}", file=sys.stderr)
         sys.exit(1)

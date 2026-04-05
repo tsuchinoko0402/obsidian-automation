@@ -1,7 +1,7 @@
 import os
 from google import genai
 
-def generate_daily_update(period: str, current_note: str, calendar_events: list, tasks: list, prompt_template_path: str = None) -> str:
+def generate_daily_update(period: str, current_note: str, calendar_events: list = None, tasks: list = None, completed_tasks: list = None, prompt_template_path: str = None) -> str:
     """
     Gemini APIを使用してデイリーノートの更新内容を生成します。
     """
@@ -10,6 +10,10 @@ def generate_daily_update(period: str, current_note: str, calendar_events: list,
         raise ValueError("環境変数 GEMINI_API_KEY が設定されていません。")
         
     client = genai.Client(api_key=api_key)
+    
+    calendar_events = calendar_events or []
+    tasks = tasks or []
+    completed_tasks = completed_tasks or []
     
     prompt_template = ""
     if prompt_template_path and os.path.exists(prompt_template_path):
@@ -21,17 +25,31 @@ def generate_daily_update(period: str, current_note: str, calendar_events: list,
 元のノートのレイアウト（見出しや構成）を維持したまま、内容を追加・整理してください。
 出力はMarkdownのテキストのみとしてください。
 
-実行タイミング: {period}
+{period_instruction}
 
+【提供データ】
 本日の予定:
 {calendar}
 
 未完了タスク:
 {tasks}
 
+本日完了したタスク:
+{completed_tasks}
+
 現在のノートの内容:
 {current_note}
 """
+
+    period_instruction = ""
+    if period == "morning":
+        period_instruction = "【指示】\n朝のセットアップを行います。提供された「本日の予定」と「未完了タスク」をノート内の適切な場所（例えば今日のスケジュールやタスク一覧セクション）に追記してください。"
+    elif period == "evening":
+        period_instruction = "【指示】\n夕方の整理を行います。日中のメモをカテゴリ（Scout, Music, Tech, Privateなど）に分類して活動・思考ログのセクションに追記してください。"
+    elif period == "night":
+        period_instruction = "【指示】\n夜の最終確定を行います。提供された「本日完了したタスク」を「✅ Completed Today」などの実績セクションに追記し、明日に向けた整理を行ってください。"
+    else:
+        period_instruction = f"【指示】\n実行タイミング: {period}"
 
     calendar_text = ""
     for event in calendar_events:
@@ -47,11 +65,20 @@ def generate_daily_update(period: str, current_note: str, calendar_events: list,
         tasks_text += f"- [ ] {title}\n"
     if not tasks_text:
         tasks_text = "なし\n"
+
+    completed_text = ""
+    for task in completed_tasks:
+        title = task.get('title', 'No title')
+        completed_text += f"- [x] {title}\n"
+    if not completed_text:
+        completed_text = "なし\n"
         
     prompt = prompt_template.format(
         period=period,
+        period_instruction=period_instruction,
         calendar=calendar_text,
         tasks=tasks_text,
+        completed_tasks=completed_text,
         current_note=current_note
     )
     

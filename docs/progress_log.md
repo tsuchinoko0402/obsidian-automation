@@ -23,6 +23,22 @@
 - `python-dotenv` を追加し、プロジェクトルートの `.env` ファイルから `GEMINI_API_KEY` などの環境変数を読み込めるように `src/daily_manager.py` を修正。
 - 上記の実装に対応する単体テストを `tests/` に追加・修正し、全テストパスを確認（`PYTHONPATH=. uv run pytest tests/` で13件中13件成功）。
 
+## 2026-04-05: 朝と夜の個別ワークフロー基盤の構築
+
+- `src/google_api_services.py` に `get_completed_tasks` 関数を追加し、Google Tasksから指定日（今日）の完了済みタスクのみを取得する処理を実装。
+- `src/gemini_helper.py` のプロンプトを改修。単なる時間帯文字列の置換から、朝・夕・夜それぞれの役割に合わせた専用の指示（プロンプト）を生成してGeminiに渡すように変更。
+- `src/daily_manager.py` において、`morning`, `evening`, `night` でそれぞれ異なるデータを取得・処理するように分岐処理を追加。
+- 朝（`morning`）の処理開始時に `obsidian daily` コマンドを実行し、ノートが未作成の場合は自動で生成（開く）する処理を追加。
+- 夜（`night`）の処理完了後に `obsidian daily` コマンドでノートを開き手動レビューを促す機能と、プロジェクト直下に `mirror_obsidian.sh` が存在する場合はGoogle Drive等への同期を実行する機能を追加。
+- 上記の実装に対応する単体テストの修正を行い、全テストパスを確認（`PYTHONPATH=. uv run pytest tests/` で13件中13件成功）。
+
 ## 現在の課題
+- 夕方（`evening`）の処理における、外部ソース（Google Keep, LINE Botなど）からのデータ収集ロジックの実装。
 - `obsidian-daily` コマンドとしてどこからでも呼び出せるようにするためのシンボリックリンクの作成（ユーザー環境での設定待ち）。
 - Cron等による自動実行スケジュールの確認。
+
+## 2026-04-05: Inbox自動整理機能 (organize) の追加
+
+- `src/inbox_organizer.py` を新規作成し、`00_inbox` 内のマークダウンファイルをGemini API（構造化JSON出力）を用いて自動分類するロジックを実装。
+- ユーザー指定のフォルダ構成（`10_scout`, `20_music`, `30_tech`など）および対象MOCリストに基づき、適切なフォルダへのファイル移動とMOCへのリンク追記（`[[ノート名]]`）を行う仕組みを構築。
+- `src/daily_manager.py` のコマンドライン引数に `organize` を追加し、`uv run src/daily_manager.py organize` として単独実行できる機能を提供。

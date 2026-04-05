@@ -38,3 +38,38 @@ def get_tasks():
     # '@default' tasklist
     tasks_result = service.tasks().list(tasklist='@default', showHidden=False).execute()
     return tasks_result.get('items', [])
+
+def get_completed_tasks(date=None):
+    """
+    Google Tasksから指定された日付（デフォルトは今日）に完了したタスクを取得します。
+    """
+    creds = get_credentials()
+    service = build('tasks', 'v1', credentials=creds)
+    
+    if date is None:
+        date = datetime.date.today()
+        
+    start_of_day = datetime.datetime.combine(date, datetime.time.min).astimezone()
+    end_of_day = datetime.datetime.combine(date, datetime.time.max).astimezone()
+    
+    # '@default' tasklist
+    # showHidden=True to include completed tasks
+    tasks_result = service.tasks().list(tasklist='@default', showHidden=True).execute()
+    
+    all_tasks = tasks_result.get('items', [])
+    completed_tasks = []
+    
+    for task in all_tasks:
+        if task.get('status') == 'completed':
+            completed_date_str = task.get('completed')
+            if completed_date_str:
+                # API returns string like "2026-04-05T12:00:00.000Z"
+                # python 3.12 fromisoformat handles 'Z' correctly
+                try:
+                    completed_dt = datetime.datetime.fromisoformat(completed_date_str).astimezone()
+                    if start_of_day <= completed_dt <= end_of_day:
+                        completed_tasks.append(task)
+                except ValueError:
+                    pass
+                    
+    return completed_tasks

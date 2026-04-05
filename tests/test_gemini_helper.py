@@ -33,7 +33,7 @@ def test_generate_daily_update(mock_get_env, mock_genai):
     prompt_arg = kwargs.get('contents') or mock_client.models.generate_content.call_args[0][0]
     
     assert kwargs.get('model') == 'gemini-pro-latest'
-    assert "morning" in prompt_arg
+    assert "朝のセットアップを行います" in prompt_arg
     assert "Meeting" in prompt_arg
     assert "Do laundry" in prompt_arg
     assert "current note" in prompt_arg
