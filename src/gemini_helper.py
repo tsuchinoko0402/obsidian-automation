@@ -1,5 +1,5 @@
 import os
-import google.generativeai as genai
+from google import genai
 
 def generate_daily_update(period: str, current_note: str, calendar_events: list, tasks: list, prompt_template_path: str = None) -> str:
     """
@@ -9,9 +9,7 @@ def generate_daily_update(period: str, current_note: str, calendar_events: list,
     if not api_key:
         raise ValueError("環境変数 GEMINI_API_KEY が設定されていません。")
         
-    genai.configure(api_key=api_key)
-    # Use standard pro model as text generation is standard
-    model = genai.GenerativeModel('gemini-1.5-pro')
+    client = genai.Client(api_key=api_key)
     
     prompt_template = ""
     if prompt_template_path and os.path.exists(prompt_template_path):
@@ -57,5 +55,8 @@ def generate_daily_update(period: str, current_note: str, calendar_events: list,
         current_note=current_note
     )
     
-    response = model.generate_content(prompt)
+    response = client.models.generate_content(
+        model='gemini-1.5-pro',
+        contents=prompt
+    )
     return response.text

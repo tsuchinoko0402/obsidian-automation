@@ -99,6 +99,15 @@ def process_night():
     process_daily_note("night")
 
 def main():
+    # .envファイルの読み込み
+    try:
+        from dotenv import load_dotenv
+        # スクリプトの存在するディレクトリ（src）の親ディレクトリにある .env を探す
+        env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env')
+        load_dotenv(dotenv_path=env_path)
+    except ImportError:
+        pass # dotenvがインストールされていない場合はスキップ
+
     parser = argparse.ArgumentParser(
         description="Obsidian のデイリーノートを管理・更新するツール"
     )
