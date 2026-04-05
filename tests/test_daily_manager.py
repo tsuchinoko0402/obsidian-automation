@@ -15,12 +15,17 @@ from src.daily_manager import (
 )
 
 def test_get_daily_note_path_success():
-    mock_result = MagicMock()
-    mock_result.stdout = "/path/to/daily_note.md\n"
-    
-    with patch("src.daily_manager.subprocess.run", return_value=mock_result) as mock_run:
+    def mock_run(*args, **kwargs):
+        mock_result = MagicMock()
+        if "vault" in args[0]:
+            mock_result.stdout = "/path/to/vault\n"
+        elif "daily:path" in args[0]:
+            mock_result.stdout = "01_daily/daily_note.md\n"
+        return mock_result
+
+    with patch("src.daily_manager.subprocess.run", side_effect=mock_run) as mock_run_call:
         result = get_daily_note_path()
-        assert result == "/path/to/daily_note.md"
+        assert result == "/path/to/vault/01_daily/daily_note.md"
 
 def test_find_vault_root():
     with patch("os.path.exists") as mock_exists:

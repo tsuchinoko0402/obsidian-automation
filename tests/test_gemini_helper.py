@@ -6,7 +6,11 @@ from src.gemini_helper import generate_daily_update
 @patch("src.gemini_helper.genai")
 @patch("src.gemini_helper.os.environ.get")
 def test_generate_daily_update(mock_get_env, mock_genai):
-    mock_get_env.return_value = "fake_api_key"
+    def mock_env_get(key, default=None):
+        if key == "GEMINI_API_KEY":
+            return "fake_api_key"
+        return default
+    mock_get_env.side_effect = mock_env_get
     mock_client = MagicMock()
     mock_response = MagicMock()
     mock_response.text = "updated text"
@@ -28,7 +32,7 @@ def test_generate_daily_update(mock_get_env, mock_genai):
     kwargs = mock_client.models.generate_content.call_args[1]
     prompt_arg = kwargs.get('contents') or mock_client.models.generate_content.call_args[0][0]
     
-    assert kwargs.get('model') == 'gemini-1.5-pro'
+    assert kwargs.get('model') == 'gemini-pro-latest'
     assert "morning" in prompt_arg
     assert "Meeting" in prompt_arg
     assert "Do laundry" in prompt_arg

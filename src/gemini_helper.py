@@ -55,8 +55,10 @@ def generate_daily_update(period: str, current_note: str, calendar_events: list,
         current_note=current_note
     )
     
+    model_name = os.environ.get("GEMINI_MODEL", "gemini-pro-latest")
+    
     response = client.models.generate_content(
-        model='gemini-1.5-pro',
+        model=model_name,
         contents=prompt
     )
     return response.text

@@ -11,23 +11,41 @@ import sys
 import subprocess
 import os
 
+# プロジェクトルートをシステムのパスに追加し、'src' モジュールを解決できるようにする
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 from src.google_api_services import get_calendar_events, get_tasks
 from src.gemini_helper import generate_daily_update
 
 def get_daily_note_path() -> str:
-    """Obsidian CLI を使用して現在のデイリーノートのパスを取得します。"""
+    """Obsidian CLI を使用して現在のデイリーノートの絶対パスを取得します。"""
     try:
-        # obsidian daily:path コマンドを実行し、標準出力を取得
-        result = subprocess.run(
+        # obsidian vault info=path コマンドを実行し、Vaultのパスを取得
+        vault_result = subprocess.run(
+            ["obsidian", "vault", "info=path"], 
+            capture_output=True, 
+            text=True, 
+            check=True
+        )
+        vault_path = vault_result.stdout.strip()
+
+        # obsidian daily:path コマンドを実行し、デイリーノートのパスを取得
+        daily_result = subprocess.run(
             ["obsidian", "daily:path"], 
             capture_output=True, 
             text=True, 
             check=True
         )
-        # 改行文字などを取り除いて返す
-        return result.stdout.strip()
+        daily_path = daily_result.stdout.strip()
+        
+        if not os.path.isabs(daily_path):
+            daily_path = os.path.join(vault_path, daily_path)
+            
+        return daily_path
     except subprocess.CalledProcessError as e:
-        print(f"Obsidian CLI (daily:path) の実行に失敗しました: {e.stderr}", file=sys.stderr)
+        print(f"Obsidian CLI の実行に失敗しました: {e.stderr}", file=sys.stderr)
         raise
     except FileNotFoundError:
         print("obsidian コマンドが見つかりません。CLIツールがインストールされ、パスが通っているか確認してください。", file=sys.stderr)
