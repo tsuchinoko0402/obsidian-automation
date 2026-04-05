@@ -9,6 +9,10 @@ Google Calendar や Google Tasks などの外部サービスと連携し、
 import argparse
 import sys
 import subprocess
+import os
+
+from src.google_api_services import get_calendar_events, get_tasks
+from src.gemini_helper import generate_daily_update
 
 def get_daily_note_path() -> str:
     """Obsidian CLI を使用して現在のデイリーノートのパスを取得します。"""
@@ -29,38 +33,70 @@ def get_daily_note_path() -> str:
         print("obsidian コマンドが見つかりません。CLIツールがインストールされ、パスが通っているか確認してください。", file=sys.stderr)
         raise
 
-def process_morning():
-    """朝の処理：一日のスケジュールやタスクをデイリーノートにセットアップする"""
-    print("朝の処理 (morning) を開始します...")
+def find_vault_root(daily_path: str) -> str:
+    """デイリーノートのパスからObsidian Vaultのルートディレクトリを探します。"""
+    current_dir = os.path.dirname(daily_path)
+    while current_dir != os.path.dirname(current_dir): # ルートディレクトリに到達するまで
+        if os.path.exists(os.path.join(current_dir, ".obsidian")):
+            return current_dir
+        current_dir = os.path.dirname(current_dir)
+    return os.path.dirname(daily_path) # 見つからない場合は親ディレクトリを返す
+
+def process_daily_note(period: str):
+    """指定された期間(morning/evening/night)のデイリーノート処理を実行します"""
+    print(f"{period} の処理を開始します...")
     try:
         daily_path = get_daily_note_path()
         print(f"対象デイリーノート: {daily_path}")
-    except Exception:
-        return
-    # TODO: Google Calendar/Tasks からの取得、デイリーノートへの追記ロジック
-    print("-> 処理完了")
+        
+        if not os.path.exists(daily_path):
+            print("デイリーノートが存在しません。Obsidian側で作成されているか確認してください。", file=sys.stderr)
+            return
+            
+        with open(daily_path, "r", encoding="utf-8") as f:
+            current_note = f.read()
+            
+        print("Google Calendar と Tasks からデータを取得中...")
+        events = get_calendar_events()
+        tasks = get_tasks()
+        
+        vault_root = find_vault_root(daily_path)
+        prompt_template_path = os.path.join(vault_root, "_config", "templates", "prompts", "daily_edit_prompt.md")
+        if not os.path.exists(prompt_template_path):
+            prompt_template_path = None
+            
+        print("Gemini API でノートの更新内容を生成中...")
+        updated_note = generate_daily_update(period, current_note, events, tasks, prompt_template_path)
+        
+        with open(daily_path, "w", encoding="utf-8") as f:
+            clean_note = updated_note.strip()
+            # Markdownコードブロックでラップされている場合は除去
+            if clean_note.startswith("```markdown"):
+                clean_note = clean_note[11:]
+            elif clean_note.startswith("```"):
+                clean_note = clean_note[3:]
+            if clean_note.endswith("```"):
+                clean_note = clean_note[:-3]
+                
+            f.write(clean_note.strip() + "\n")
+            
+        print("-> 処理完了")
+        
+    except Exception as e:
+        print(f"処理中にエラーが発生しました: {e}", file=sys.stderr)
+        raise
+
+def process_morning():
+    """朝の処理：一日のスケジュールやタスクをデイリーノートにセットアップする"""
+    process_daily_note("morning")
 
 def process_evening():
     """夕方の処理：一日の振り返りや未完了タスクの整理を行う"""
-    print("夕方の処理 (evening) を開始します...")
-    try:
-        daily_path = get_daily_note_path()
-        print(f"対象デイリーノート: {daily_path}")
-    except Exception:
-        return
-    # TODO: デイリーノートの整理ロジック
-    print("-> 処理完了")
+    process_daily_note("evening")
 
 def process_night():
     """夜の処理：翌日に向けた最終整理とノートの確定を行う"""
-    print("夜の処理 (night) を開始します...")
-    try:
-        daily_path = get_daily_note_path()
-        print(f"対象デイリーノート: {daily_path}")
-    except Exception:
-        return
-    # TODO: デイリーノートの確定ロジック
-    print("-> 処理完了")
+    process_daily_note("night")
 
 def main():
     parser = argparse.ArgumentParser(
