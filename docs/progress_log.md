@@ -32,10 +32,31 @@
 - 夜（`night`）の処理完了後に `obsidian daily` コマンドでノートを開き手動レビューを促す機能と、プロジェクト直下に `mirror_obsidian.sh` が存在する場合はGoogle Drive等への同期を実行する機能を追加。
 - 上記の実装に対応する単体テストの修正を行い、全テストパスを確認（`PYTHONPATH=. uv run pytest tests/` で13件中13件成功）。
 
-## 現在の課題
-- 夕方（`evening`）の処理における、外部ソース（Google Keep, LINE Botなど）からのデータ収集ロジックの実装。
-- `obsidian-daily` コマンドとしてどこからでも呼び出せるようにするためのシンボリックリンクの作成（ユーザー環境での設定待ち）。
-- Cron等による自動実行スケジュールの確認。
+## 2026-04-05: Google Keepの実装と夕方 (evening) プロセスの完成
+
+- `gkeepapi` ライブラリを追加し、`src/google_api_services.py` に `get_keep_notes` を実装。`.env` から `KEEP_USERNAME` と `KEEP_PASSWORD`（アプリパスワード）を読み込み、直近24時間以内に更新されたメモを自動取得する仕組みを構築。
+- `.env.example` に Google Keep の認証情報に関する項目を追加。
+- `src/daily_manager.py` の `evening` 処理にて、実際に Google Keep のメモを取得して Gemini に渡すように変更。
+- `src/gemini_helper.py` のプロンプトを更新し、「Google Keepメモ」と「未完了タスク」を読み解いて日中のメモをカテゴリ（Scout, Music, Tech, Privateなど）に分類して活動・思考ログに追記するよう指示を追加。
+- これにより、朝(`morning`)、夕方(`evening`)、夜(`night`) の3つの時間帯に応じた独自のワークフロー（データの取得元とGeminiへのプロンプトの出し分け）が実データを用いて稼働可能な状態で完成。
+
+## 2026-04-05: Apple純正メモ連携機能の基盤構築 (macnotesapp)
+
+- `macnotesapp` ライブラリを追加。
+- `src/apple_notes_helper.py` を新規作成し、以下の機能を実装：
+    - `get_unprocessed_apple_notes()`: Appleメモアプリから「#処理済み」タグが付いていないメモを取得。
+    - `mark_apple_note_as_processed(note)`: 指定されたAppleメモに「#処理済み」タグを付与。
+- `tests/test_apple_notes_helper.py` を作成し、上記機能の単体テストを実装。全テストがパスすることを確認（`PYTHONPATH=. uv run pytest tests/` で17件中17件成功）。
+- 今後、このヘルパー関数を利用して Gemini と連携し、メモの分類・整理を行う予定。
+
+## 2026-04-05: Apple純正メモ連携機能の基盤構築 (macnotesapp)
+
+- `macnotesapp` ライブラリを追加。
+- `src/apple_notes_helper.py` を新規作成し、以下の機能を実装：
+    - `get_unprocessed_apple_notes()`: Appleメモアプリから「#処理済み」タグが付いていないメモを取得。
+    - `mark_apple_note_as_processed(note)`: 指定されたAppleメモに「#処理済み」タグを付与。
+- `tests/test_apple_notes_helper.py` を作成し、上記機能の単体テストを実装。全テストがパスすることを確認（`PYTHONPATH=. uv run pytest tests/` で17件中17件成功）。
+- 今後、このヘルパー関数を利用して Gemini と連携し、メモの分類・整理を行う予定。
 
 ## 2026-04-05: Inbox自動整理機能 (organize) の追加
 

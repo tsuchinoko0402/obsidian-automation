@@ -39,6 +39,74 @@ def get_tasks():
     tasks_result = service.tasks().list(tasklist='@default', showHidden=False).execute()
     return tasks_result.get('items', [])
 
+def get_keep_notes(days_back=1):
+    """
+    gkeepapiを使用してGoogle Keepから最近のメモを取得します。
+    """
+    import os
+    import gkeepapi
+    
+    username = os.environ.get("KEEP_USERNAME")
+    password = os.environ.get("KEEP_PASSWORD")
+    token_file = 'keep_token.txt'
+    
+    if not username or not password:
+        print("Google Keepの認証情報が設定されていません (.envのKEEP_USERNAME/KEEP_PASSWORDを確認してください)。")
+        return []
+
+    keep = gkeepapi.Keep()
+    
+    # トークンによる認証を試みる
+    try:
+        if os.path.exists(token_file):
+            with open(token_file, 'r') as f:
+                master_token = f.read().strip()
+            if master_token:
+                keep.resume(username, master_token)
+                print("Google Keep: 既存のトークンで認証しました。")
+            else:
+                raise ValueError("空のトークンファイルです。")
+        else:
+            # 新規認証（アプリパスワードを使用）
+            print(f"Google Keep: {username} として新規認証を試行中...")
+            keep.authenticate(username, password)
+            master_token = keep.getMasterToken()
+            if master_token:
+                with open(token_file, 'w') as f:
+                    f.write(master_token)
+                print("Google Keep: 新しいトークンを発行して認証しました。")
+            else:
+                print("Google Keep: 認証に成功しましたが、トークンの取得に失敗しました。")
+    except Exception as e:
+        print(f"Google Keepの認証に失敗しました: {e}")
+        print("【確認事項】")
+        print("1. .env の KEEP_PASSWORD が「16桁のアプリパスワード」であることを確認してください。")
+        print("2. 以下のURLにアクセスしてアクセスを許可してください: https://accounts.google.com/DisplayUnlockCaptcha")
+        # 認証に失敗した場合はトークンファイルを削除
+        if os.path.exists(token_file):
+            os.remove(token_file)
+        return []
+
+    # 全メモを同期
+    keep.sync()
+
+    # 抽出する基準時間を設定 (24時間前)
+    threshold = datetime.datetime.now() - datetime.timedelta(days=days_back)
+    
+    # 全メモを取得（アーカイブ・ゴミ箱以外）
+    notes = keep.find(archived=False, trashed=False)
+
+    recent_notes_text = []
+
+    for note in notes:
+        # note.timestamps.updated は naive な datetime (UTC)
+        if note.timestamps.updated > threshold:
+            # タイトルと本文を整形
+            title = note.title if note.title else "(無題)"
+            recent_notes_text.append(f"【{title}】\n{note.text}")
+
+    return recent_notes_text
+
 def get_completed_tasks(date=None):
     """
     Google Tasksから指定された日付（デフォルトは今日）に完了したタスクを取得します。

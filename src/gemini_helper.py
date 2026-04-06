@@ -1,7 +1,7 @@
 import os
 from google import genai
 
-def generate_daily_update(period: str, current_note: str, calendar_events: list = None, tasks: list = None, completed_tasks: list = None, prompt_template_path: str = None) -> str:
+def generate_daily_update(period: str, current_note: str, calendar_events: list = None, tasks: list = None, completed_tasks: list = None, keep_notes: list = None, prompt_template_path: str = None) -> str:
     """
     Gemini APIを使用してデイリーノートの更新内容を生成します。
     """
@@ -14,6 +14,7 @@ def generate_daily_update(period: str, current_note: str, calendar_events: list 
     calendar_events = calendar_events or []
     tasks = tasks or []
     completed_tasks = completed_tasks or []
+    keep_notes = keep_notes or []
     
     prompt_template = ""
     if prompt_template_path and os.path.exists(prompt_template_path):
@@ -31,11 +32,14 @@ def generate_daily_update(period: str, current_note: str, calendar_events: list 
 本日の予定:
 {calendar}
 
-未完了タスク:
+未完了タスク (Google Todos):
 {tasks}
 
 本日完了したタスク:
 {completed_tasks}
+
+Google Keepメモ:
+{keep_notes}
 
 現在のノートの内容:
 {current_note}
@@ -45,7 +49,7 @@ def generate_daily_update(period: str, current_note: str, calendar_events: list 
     if period == "morning":
         period_instruction = "【指示】\n朝のセットアップを行います。提供された「本日の予定」と「未完了タスク」をノート内の適切な場所（例えば今日のスケジュールやタスク一覧セクション）に追記してください。"
     elif period == "evening":
-        period_instruction = "【指示】\n夕方の整理を行います。日中のメモをカテゴリ（Scout, Music, Tech, Privateなど）に分類して活動・思考ログのセクションに追記してください。"
+        period_instruction = "【指示】\n夕方の整理を行います。提供された「Google Keepメモ」と「未完了タスク」を読み解き、日中のメモをカテゴリ（Scout, Music, Tech, Privateなど）に分類して活動・思考ログのセクションに追記・整理してください。"
     elif period == "night":
         period_instruction = "【指示】\n夜の最終確定を行います。提供された「本日完了したタスク」を「✅ Completed Today」などの実績セクションに追記し、明日に向けた整理を行ってください。"
     else:
@@ -73,12 +77,19 @@ def generate_daily_update(period: str, current_note: str, calendar_events: list 
     if not completed_text:
         completed_text = "なし\n"
         
+    keep_text = ""
+    for note in keep_notes:
+        keep_text += f"- {note}\n"
+    if not keep_text:
+        keep_text = "なし\n"
+        
     prompt = prompt_template.format(
         period=period,
         period_instruction=period_instruction,
         calendar=calendar_text,
         tasks=tasks_text,
         completed_tasks=completed_text,
+        keep_notes=keep_text,
         current_note=current_note
     )
     
