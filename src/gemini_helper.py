@@ -16,9 +16,15 @@ def generate_daily_update(period: str, current_note: str, calendar_events: list 
     completed_tasks = completed_tasks or []
     keep_notes = keep_notes or []
     
+    # プロジェクトのデフォルトプロンプト（docs/prompts/daily_update.md）をチェック
+    project_prompt_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "docs", "prompts", "daily_update.md")
+    
     prompt_template = ""
     if prompt_template_path and os.path.exists(prompt_template_path):
         with open(prompt_template_path, 'r', encoding='utf-8') as f:
+            prompt_template = f.read()
+    elif os.path.exists(project_prompt_path):
+        with open(project_prompt_path, 'r', encoding='utf-8') as f:
             prompt_template = f.read()
     else:
         prompt_template = """あなたはObsidianを「第二の脳」として管理するアシスタントです。

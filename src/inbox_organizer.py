@@ -30,7 +30,15 @@ def organize_inbox(vault_root: str):
     client = genai.Client(api_key=api_key)
     model_name = os.environ.get("GEMINI_MODEL", "gemini-pro-latest")
     
-    system_prompt = """あなたはObsidianのノート整理アシスタントです。
+    # プロジェクトのプロンプトファイルをチェック
+    project_prompt_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "docs", "prompts", "inbox_organizer.md")
+    
+    system_prompt = ""
+    if os.path.exists(project_prompt_path):
+        with open(project_prompt_path, 'r', encoding='utf-8') as f:
+            system_prompt = f.read()
+    else:
+        system_prompt = """あなたはObsidianのノート整理アシスタントです。
 提供されたメモの内容を読み、以下のフォルダ構成とMOC（目次）リストから、最も適切な移動先フォルダと追加すべきMOCを選んでください。
 
 【フォルダ構成】

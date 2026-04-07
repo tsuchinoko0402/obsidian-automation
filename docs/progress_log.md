@@ -41,8 +41,13 @@
 
 - `macnotesapp` ライブラリを用いて、Appleメモアプリから未処理（「#処理済み」タグがない）メモを取得し、Geminiで要約または新規ノート作成を行う機能を実装。
 - 循環インポート（circular import）問題を解決するため、Vaultパス取得等の共通関数を `src/obsidian_utils.py` に分離。
-- `src/notes_processor.py` で発生していた `SyntaxError`（f-string内の改行文字の扱い）を、`sed` および精密な `replace` を用いて修正完了。
-- 実際にApple Notesからメモを取り込み、Geminiの判断で新規ノート作成やデイリーノートへのリンク追記ができることを確認。
+- `src/notes_processor.py` で発生していた `SyntaxError` を完全に修正し、Apple Notesからの取り込みが正常に動作することを確認。
+
+## 2026-04-05: プロンプトの外部ファイル化と管理
+
+- Geminiへの指示内容（システムプロンプト等）を `docs/prompts/` ディレクトリ配下のMarkdownファイルとして分離。
+- `docs/prompts/daily_update.md`, `inbox_organizer.md`, `apple_notes_processor.md` を作成。
+- 各モジュールがこれらの外部ファイルを優先的に読み込むように修正し、コードを触らずに指示内容を調整可能にした。
 
 ## 2026-04-05: Inbox自動整理機能 (organize) の追加
 
