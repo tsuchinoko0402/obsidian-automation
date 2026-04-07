@@ -5,3 +5,7 @@ credentials.json
 __pycache__/
 .venv/
 .DS_Store
+
+# Log files
+logs/
+cron_log.txt
